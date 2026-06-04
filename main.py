@@ -1,39 +1,70 @@
+import telebot
+import datetime
+import pytz
 import qrcode
-from datetime import datetime
+from PIL import Image
+from io import BytesIO
 
-# --- I TUOI DATI AGGIORNATI (22 Feb) ---
-static_lines = [
-    "7_GIORNI",
+TOKEN = "INSERISCI_QUI_IL_TUO_TOKEN"   # ← Cambia con il tuo token
+
+bot = telebot.TeleBot(TOKEN)
+
+dati_fissi = [
+    "MENSILE",
     "ANM",
-    "2026-02-22T17:42",
-    "2026-02-28T23:59",
-    "E3GGJ2BYZE",
-    "15",
+    "2026-06-02T11:40",
+    "2026-06-30T23:59",
+    "MGZET9AUBP",
+    "11",
     "2",
     "4",
-    "050e9ecf31070627ed6a06783002899a3059e5749040e7f77aeb18f80c"
+    "05c36d9fce339ec6dc8711e828433a27bd3ff535a49b2abe7f6a02927f"
 ]
 
-# --- CALCOLO ORARIO ATTUALE ---
-now = datetime.now()
-timestamp_line = now.strftime("%Y-%m-%dT%H:%M:%S") + "+01:00"
+variants = {
+    "0.5cm": 59,
+    "1cm": 118,
+    "1.5cm": 177,
+    "2cm": 236
+}
 
-# Unisce i dati
-full_data = "\n".join(static_lines) + "\n" + timestamp_line
+@bot.message_handler(commands=['start'])
+def start(message):
+    markup = telebot.types.InlineKeyboardMarkup(row_width=2)
+    for size in variants:
+        markup.add(telebot.types.InlineKeyboardButton(size, callback_data=size))
+    
+    bot.send_message(message.chat.id, 
+        "👋 *Generatore QR ANM*\n\nClicca sulla dimensione:", 
+        reply_markup=markup, parse_mode='Markdown')
 
-print(f"Generato QR per le ore: {timestamp_line}")
+@bot.callback_query_handler(func=lambda call: True)
+def button_click(call):
+    size = call.data
+    genera_qr_code(call.message.chat.id, size)
+    bot.answer_callback_query(call.id)
 
-# --- CREAZIONE QR (Piccolo e compatto) ---
-qr = qrcode.QRCode(
-    version=7,
-    error_correction=qrcode.constants.ERROR_CORRECT_L,
-    box_size=5,  # Dimensione ridotta per vederlo bene
-    border=2,
-)
+def genera_qr_code(chat_id, size):
+    pixels = variants[size]
 
-qr.add_data(full_data)
-qr.make(fit=True)
+    tz = pytz.timezone('Europe/Rome')
+    timestamp = datetime.datetime.now(tz).isoformat(timespec='seconds')
 
-# Salva l'immagine
-img = qr.make_image(fill_color="black", back_color="white")
-img.save("qr.png")
+    dati = dati_fissi + [timestamp]
+    testo = "\n".join(dati)
+
+    qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_H, box_size=16, border=1)
+    qr.add_data(testo)
+    qr.make(fit=True)
+
+    img = qr.make_image(fill_color="#000000", back_color="#FFFFFF")
+    img = img.resize((pixels, pixels), Image.Resampling.NEAREST)
+
+    bio = BytesIO()
+    img.save(bio, 'PNG')
+    bio.seek(0)
+
+    bot.send_photo(chat_id, bio, caption=f"✅ QR {size} generato\n⏰ {timestamp}")
+
+print("🤖 Bot aggiornato avviato...")
+bot.infinity_polling()
