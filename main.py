@@ -5,7 +5,7 @@ import qrcode
 from PIL import Image
 from io import BytesIO
 
-TOKEN = "INSERISCI_QUI_IL_TUO_TOKEN"   # ← Cambia con il tuo token
+TOKEN = "8239347929:AAEGr4xywdLShOGiAywcwJlCiODGExZ7nQ0"   # ← Cambia con il tuo token
 
 bot = telebot.TeleBot(TOKEN)
 
